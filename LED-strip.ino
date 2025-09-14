@@ -27,47 +27,30 @@
 #include <ESP8266mDNS.h>
 
 /***** ====== USER CONFIG ====== *****/
-// Option A: Hard-code your Wi‑Fi
 const char* WIFI_SSID     = "HUAWEI-2.4G-zNP6";
-const char* WIFI_PASSWORD = "TVjvGe5F";
+const char* WIFI_PASSWORD = "";
 
-// Option B: If Wi‑Fi connect fails, a fallback AP will be created:
 const char* AP_SSID       = "LED-Strip";
-const char* AP_PASSWORD   = "ledstrip123"; // 8+ chars required
+const char* AP_PASSWORD   = "ledstrip123";
 
-// mDNS name => http://HOSTNAME.local
 const char* HOSTNAME      = "ledstrip";
 
-// Pin mapping for D1 mini (ESP8266)
-// D5=GPIO14, D6=GPIO12, D7=GPIO13, D8=GPIO15
 const uint8_t PIN_R = D8;  // R -> D8 (red wire)
 const uint8_t PIN_G = D7;  // G -> D7 (orange wire)
 const uint8_t PIN_B = D5;  // B -> D5 (yello wire)
 const uint8_t PIN_W = D6;  // W -> D6 (green wire)
 
-// Output inversion: set true if your wiring requires inverting PWM (rare)
 const bool INVERT_R = true;
 const bool INVERT_G = true;
 const bool INVERT_B = true;
-const bool INVERT_W = true;  // unchanged
-
-
-// Enable gamma correction for smoother low‑end dimming
-const bool ENABLE_GAMMA = false; //temporary
+const bool INVERT_W = true;
 
 /***** ====== GLOBALS ====== *****/
 ESP8266WebServer server(80);
 
-// Store current channel values (0–255) and master brightness (0–255)
 uint8_t chR = 0,   chG = 0,   chB = 0,   chW = 0,   master = 255;
 
-// 8→10‑bit scaling for ESP8266 analogWrite (0..1023)
-static uint16_t gammaTable[256];
-
 static inline uint16_t toPWM(uint8_t v) {
-  if (ENABLE_GAMMA) {
-    return gammaTable[v];
-  }
   // Linear scale 0..255 → 0..1023
   return (uint16_t)map(v, 0, 255, 0, 1023);
 }
@@ -77,9 +60,8 @@ static inline uint16_t applyInvert(uint16_t pwm, bool inv) {
 }
 
 void applyPWM() {
-  // Apply master brightness (as a scale 0..255)
   auto scale = [](uint8_t v, uint8_t m) -> uint8_t {
-    return (uint16_t)v * m / 255;  // prevent overflow
+    return (uint16_t)v * m / 255;
   };
 
   uint16_t pr = applyInvert(toPWM(scale(chR, master)), INVERT_R);
@@ -376,8 +358,8 @@ void setup() {
   Serial.println("\nBooting LED Strip Controller...");
 
   // PWM setup
-  analogWriteRange(1023);      // ESP8266 default is already 1023
-  analogWriteFreq(1000);       // 1 kHz – safe for most MOSFETs and strips
+  analogWriteRange(1023);
+  analogWriteFreq(1000);
 
   pinMode(PIN_R, OUTPUT);
   pinMode(PIN_G, OUTPUT);
@@ -389,17 +371,6 @@ void setup() {
   digitalWrite(PIN_B, HIGH);
   digitalWrite(PIN_W, HIGH);
 
-  // Initialize gamma table
-  if (ENABLE_GAMMA) {
-    for (int i=0;i<256;i++) {
-      // standard gamma 2.2 mapping 0..255 → 0..1023
-      float x = i / 255.0f;
-      uint16_t y = (uint16_t)roundf(powf(x, 2.2f) * 1023.0f);
-      gammaTable[i] = y;
-    }
-  }
-
-  // Start Wi‑Fi (STA preferred, AP fallback)
   bool staOK = connectWiFiSTA();
   if (!staOK) {
     startAP();
@@ -416,7 +387,7 @@ void setup() {
   // HTTP routes
   server.on("/", HTTP_GET, handleRoot);
   server.on("/api/state", HTTP_GET, handleState);
-  server.on("/api/set", HTTP_ANY, handleSet); // accept GET or POST
+  server.on("/api/set", HTTP_ANY, handleSet);
   server.on("/api/on", HTTP_ANY, handleOn);
   server.on("/api/off", HTTP_ANY, handleOff);
   server.on("/api/diag", HTTP_ANY, handleDiag);
@@ -425,7 +396,6 @@ void setup() {
   server.begin();
   Serial.println("HTTP server started on port 80");
 
-  // Apply initial output
   applyPWM();
 }
 
