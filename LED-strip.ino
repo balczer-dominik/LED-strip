@@ -10,11 +10,11 @@
 #include <ESP8266mDNS.h>
 
 /***** USER CONFIG *****/
-const char* WIFI_SSID     = "HUAWEI-2.4G-zNP6";
+const char* WIFI_SSID = "HUAWEI-2.4G-zNP6";
 const char* WIFI_PASSWORD = "";
-const char* AP_SSID       = "LED-Strip";
-const char* AP_PASSWORD   = "ledstrip123";
-const char* HOSTNAME      = "ledstrip";
+const char* AP_SSID = "LED-Strip";
+const char* AP_PASSWORD = "ledstrip123";
+const char* HOSTNAME = "ledstrip";
 
 const uint8_t PIN_R = D8;
 const uint8_t PIN_G = D7;
@@ -30,26 +30,30 @@ const bool ENABLE_GAMMA = false;
 
 /***** GLOBALS *****/
 ESP8266WebServer server(80);
-uint8_t chR=0, chG=0, chB=0, chW=0, master=255;
-uint8_t lastMaster=255;
+uint8_t chR = 0, chG = 0, chB = 0, chW = 0, master = 255;
+uint8_t lastMaster = 255;
 static uint16_t gammaTable[256];
 
 static inline uint16_t toPWM(uint8_t v) {
-  if(ENABLE_GAMMA) return gammaTable[v];
-  return (uint16_t)map(v,0,255,0,1023);
+  if (ENABLE_GAMMA) return gammaTable[v];
+  return (uint16_t)map(v, 0, 255, 0, 1023);
 }
-static inline uint16_t applyInvert(uint16_t pwm,bool inv){return inv?(1023-pwm):pwm;}
-
-void applyPWM(){
-  auto scale = [](uint8_t v,uint8_t m){return (uint16_t)v*m/255;};
-  analogWrite(PIN_R, applyInvert(toPWM(scale(chR,master)), INVERT_R));
-  analogWrite(PIN_G, applyInvert(toPWM(scale(chG,master)), INVERT_G));
-  analogWrite(PIN_B, applyInvert(toPWM(scale(chB,master)), INVERT_B));
-  analogWrite(PIN_W, applyInvert(toPWM(scale(chW,master)), INVERT_W));
+static inline uint16_t applyInvert(uint16_t pwm, bool inv) {
+  return inv ? (1023 - pwm) : pwm;
 }
 
-String ipToStr(IPAddress ip){
-  return String(ip[0])+"."+String(ip[1])+"."+String(ip[2])+"."+String(ip[3]);
+void applyPWM() {
+  auto scale = [](uint8_t v, uint8_t m) {
+    return (uint16_t)v * m / 255;
+  };
+  analogWrite(PIN_R, applyInvert(toPWM(scale(chR, master)), INVERT_R));
+  analogWrite(PIN_G, applyInvert(toPWM(scale(chG, master)), INVERT_G));
+  analogWrite(PIN_B, applyInvert(toPWM(scale(chB, master)), INVERT_B));
+  analogWrite(PIN_W, applyInvert(toPWM(scale(chW, master)), INVERT_W));
+}
+
+String ipToStr(IPAddress ip) {
+  return String(ip[0]) + "." + String(ip[1]) + "." + String(ip[2]) + "." + String(ip[3]);
 }
 
 /***** HTML UI *****/
@@ -189,35 +193,118 @@ loadFavs();
 )HTML";
 
 /***** HTTP HANDLERS *****/
-void handleRoot(){server.send_P(200,"text/html; charset=utf-8",INDEX_HTML);}
-void handleState(){
-  String ipStr=(WiFi.getMode()==WIFI_STA&&WiFi.status()==WL_CONNECTED)?ipToStr(WiFi.localIP()):(WiFi.getMode()==WIFI_AP?ipToStr(WiFi.softAPIP()):"");
-  String json="{\"r\":"+String(chR)+",\"g\":"+String(chG)+",\"b\":"+String(chB)+",\"w\":"+String(chW)+",\"br\":"+String(master)+",\"ip\":\""+ipStr+"\"}";
-  server.send(200,"application/json",json);
+void handleRoot() {
+  server.send_P(200, "text/html; charset=utf-8", INDEX_HTML);
 }
-uint8_t getArg8(const String &name,uint8_t defVal){if(!server.hasArg(name))return defVal;int v=server.arg(name).toInt();return (v<0?0:(v>255?255:v));}
-void handleSet(){chR=getArg8("r",chR);chG=getArg8("g",chG);chB=getArg8("b",chB);chW=getArg8("w",chW);master=getArg8("br",master);applyPWM();server.send(200,"application/json","{\"ok\":true}");}
-void handleToggle(){master=(master>0)?0:255;applyPWM();server.send(200,"application/json","{\"ok\":true,\"br\":"+String(master)+"}");}
-void handleDiag(){String ch=server.hasArg("ch")?server.arg("ch"):"";ch.toUpperCase();chR=(ch=="R")?255:0;chG=(ch=="G")?255:0;chB=(ch=="B")?255:0;chW=(ch=="W")?255:0;master=255;applyPWM();server.send(200,"application/json","{\"ok\":true}");}
-void handleNotFound(){server.send(404,"text/plain","Not found: "+server.uri());}
+void handleState() {
+  String ipStr = (WiFi.getMode() == WIFI_STA && WiFi.status() == WL_CONNECTED) ? ipToStr(WiFi.localIP()) : (WiFi.getMode() == WIFI_AP ? ipToStr(WiFi.softAPIP()) : "");
+  String json = "{\"r\":" + String(chR) + ",\"g\":" + String(chG) + ",\"b\":" + String(chB) + ",\"w\":" + String(chW) + ",\"br\":" + String(master) + ",\"ip\":\"" + ipStr + "\"}";
+  server.send(200, "application/json", json);
+}
+uint8_t getArg8(const String& name, uint8_t defVal) {
+  if (!server.hasArg(name)) return defVal;
+  int v = server.arg(name).toInt();
+  return (v < 0 ? 0 : (v > 255 ? 255 : v));
+}
+void handleSet() {
+  chR = getArg8("r", chR);
+  chG = getArg8("g", chG);
+  chB = getArg8("b", chB);
+  chW = getArg8("w", chW);
+  master = getArg8("br", master);
+  applyPWM();
+  server.send(200, "application/json", "{\"ok\":true}");
+}
+void handleToggle() {
+  master = (master > 0) ? 0 : 255;
+  applyPWM();
+  server.send(200, "application/json", "{\"ok\":true,\"br\":" + String(master) + "}");
+}
+void handleDiag() {
+  String ch = server.hasArg("ch") ? server.arg("ch") : "";
+  ch.toUpperCase();
+  chR = (ch == "R") ? 255 : 0;
+  chG = (ch == "G") ? 255 : 0;
+  chB = (ch == "B") ? 255 : 0;
+  chW = (ch == "W") ? 255 : 0;
+  master = 255;
+  applyPWM();
+  server.send(200, "application/json", "{\"ok\":true}");
+}
+void handleNotFound() {
+  server.send(404, "text/plain", "Not found: " + server.uri());
+}
 
 /***** WIFI *****/
-void startAP(){WiFi.mode(WIFI_AP);WiFi.softAP(AP_SSID,AP_PASSWORD);delay(200);Serial.print("AP mode. SSID: ");Serial.print(AP_SSID);Serial.print(" IP: ");Serial.println(WiFi.softAPIP());}
-bool connectWiFiSTA(unsigned long timeoutMs=15000){WiFi.mode(WIFI_STA);WiFi.hostname(HOSTNAME);WiFi.begin(WIFI_SSID,WIFI_PASSWORD);Serial.print("Connecting to WiFi: ");Serial.println(WIFI_SSID);unsigned long start=millis();while(WiFi.status()!=WL_CONNECTED&&millis()-start<timeoutMs){delay(250);Serial.print('.');}Serial.println();if(WiFi.status()==WL_CONNECTED){Serial.print("Connected. IP: ");Serial.println(WiFi.localIP());return true;}Serial.println("WiFi connect timeout.");return false;}
+void startAP() {
+  WiFi.mode(WIFI_AP);
+  WiFi.softAP(AP_SSID, AP_PASSWORD);
+  delay(200);
+  Serial.print("AP mode. SSID: ");
+  Serial.print(AP_SSID);
+  Serial.print(" IP: ");
+  Serial.println(WiFi.softAPIP());
+}
+bool connectWiFiSTA(unsigned long timeoutMs = 15000) {
+  WiFi.mode(WIFI_STA);
+  WiFi.hostname(HOSTNAME);
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+  Serial.print("Connecting to WiFi: ");
+  Serial.println(WIFI_SSID);
+  unsigned long start = millis();
+  while (WiFi.status() != WL_CONNECTED && millis() - start < timeoutMs) {
+    delay(250);
+    Serial.print('.');
+  }
+  Serial.println();
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.print("Connected. IP: ");
+    Serial.println(WiFi.localIP());
+    return true;
+  }
+  Serial.println("WiFi connect timeout.");
+  return false;
+}
 
 /***** SETUP/LOOP *****/
-void setup(){
-  Serial.begin(115200);delay(200);Serial.println("\nBooting LED Strip Controller...");
-  analogWriteRange(1023);analogWriteFreq(1000);
-  pinMode(PIN_R,OUTPUT);pinMode(PIN_G,OUTPUT);pinMode(PIN_B,OUTPUT);pinMode(PIN_W,OUTPUT);
-  digitalWrite(PIN_R,HIGH);digitalWrite(PIN_G,HIGH);digitalWrite(PIN_B,HIGH);digitalWrite(PIN_W,HIGH);
-  if(ENABLE_GAMMA){for(int i=0;i<256;i++){float x=i/255.0f;gammaTable[i]=(uint16_t)roundf(powf(x,2.2f)*1023.0f);}}
-  if(!connectWiFiSTA()){startAP();}
-  if(MDNS.begin(HOSTNAME)){Serial.println("mDNS responder started.");}else{Serial.println("mDNS failed.");}
-  server.on("/",HTTP_GET,handleRoot);server.on("/api/state",HTTP_GET,handleState);server.on("/api/set",HTTP_ANY,handleSet);server.on("/api/toggle",HTTP_ANY,handleToggle);
-  server.on("/api/diag",HTTP_ANY,handleDiag);server.onNotFound(handleNotFound);
-  server.begin();Serial.println("HTTP server started on port 80");
+void setup() {
+  Serial.begin(115200);
+  delay(200);
+  Serial.println("\nBooting LED Strip Controller...");
+  analogWriteRange(1023);
+  analogWriteFreq(1000);
+  pinMode(PIN_R, OUTPUT);
+  pinMode(PIN_G, OUTPUT);
+  pinMode(PIN_B, OUTPUT);
+  pinMode(PIN_W, OUTPUT);
+  digitalWrite(PIN_R, HIGH);
+  digitalWrite(PIN_G, HIGH);
+  digitalWrite(PIN_B, HIGH);
+  digitalWrite(PIN_W, HIGH);
+  if (ENABLE_GAMMA) {
+    for (int i = 0; i < 256; i++) {
+      float x = i / 255.0f;
+      gammaTable[i] = (uint16_t)roundf(powf(x, 2.2f) * 1023.0f);
+    }
+  }
+  if (!connectWiFiSTA()) { startAP(); }
+  if (MDNS.begin(HOSTNAME)) {
+    Serial.println("mDNS responder started.");
+  } else {
+    Serial.println("mDNS failed.");
+  }
+  server.on("/", HTTP_GET, handleRoot);
+  server.on("/api/state", HTTP_GET, handleState);
+  server.on("/api/set", HTTP_ANY, handleSet);
+  server.on("/api/toggle", HTTP_ANY, handleToggle);
+  server.on("/api/diag", HTTP_ANY, handleDiag);
+  server.onNotFound(handleNotFound);
+  server.begin();
+  Serial.println("HTTP server started on port 80");
   applyPWM();
 }
 
-void loop(){server.handleClient();MDNS.update();}
+void loop() {
+  server.handleClient();
+  MDNS.update();
+}
